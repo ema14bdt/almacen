@@ -46,7 +46,7 @@ Sistema de gestión de inventario y punto de venta (POS) desarrollado con Django
 ### 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/ema14bdt/almacen/tree/master
+git clone https://github.com/ema14bdt/almacen.git
 cd almacen
 ```
 
