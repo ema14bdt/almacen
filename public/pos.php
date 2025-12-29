@@ -1,19 +1,29 @@
-{% extends 'pos/base.html' %}
+<?php
+// public/pos.php
+require_once 'includes/db.php';
+require_once 'includes/auth.php';
+require_once 'includes/cart_helper.php';
 
-{% block title %}Punto de Venta - Almacén EGP{% endblock %}
+require_login();
 
-{% block content %}
+$pageTitle = "Punto de Venta";
+include 'includes/header.php';
+
+// Initial render of cart
+$cartData = get_cart_items($pdo);
+?>
+
 <div class="flex flex-col h-full space-y-4" x-data="posApp()">
     
     <!-- Top Bar: Scan & Actions -->
     <div class="bg-white p-4 rounded-lg shadow flex justify-between items-center gap-4">
         <div class="flex-grow">
             <!-- Scan Form -->
-            <form hx-post="{% url 'pos_scan' %}" hx-target="#cart-container" hx-swap="innerHTML" 
+            <form hx-post="api/cart_add.php" hx-target="#cart-container" hx-swap="innerHTML" 
                   hx-on::after-request="this.reset(); document.getElementById('barcode-input').focus()"
                   @submit.prevent="if($refs.barcode.value.trim() === '') return; $el.requestSubmit()"
                   class="relative">
-                {% csrf_token %}
+                <input type="hidden" name="csrf_token" value="<?= get_csrf_token() ?>">
                 <label class="sr-only">Escanear Código</label>
                 <div class="relative">
                     <input type="text" name="barcode" id="barcode-input" x-ref="barcode" autofocus
@@ -24,12 +34,15 @@
         </div>
         
         <div class="flex space-x-2">
-            <button hx-post="{% url 'pos_clear_cart' %}" hx-target="#cart-container"
+            <!-- Cancel / Clear Cart -->
+            <button hx-post="api/cart_clear.php" hx-target="#cart-container"
                     :disabled="currentTotal <= 0"
                     :class="{'opacity-50 cursor-not-allowed': currentTotal <= 0, 'hover:bg-red-600': currentTotal > 0}"
                     class="bg-red-500 text-white font-bold py-3 px-6 rounded-lg shadow transition">
                 Cancelar
             </button>
+            
+            <!-- Checkout Button -->
             <button @click="openCheckout()"
                     :disabled="currentTotal <= 0"
                     :class="{'opacity-50 cursor-not-allowed': currentTotal <= 0, 'hover:scale-105 hover:bg-green-700': currentTotal > 0}"
@@ -42,10 +55,10 @@
     <!-- Cart Area -->
     <div id="cart-container" class="bg-white rounded-lg shadow flex-grow overflow-hidden flex flex-col"
          @htmx:after-swap.camel="updateTotal()">
-        {% include 'pos/partials/cart_list.html' %}
+        <?= render_cart_html($cartData) ?>
     </div>
 
-    <!-- Checkout Modal (Alpine.js) using Teleport to cover entire screen including navbar -->
+    <!-- Checkout Modal (Teleport to Body) -->
     <template x-teleport="body">
         <div x-show="checkoutOpen" class="fixed inset-0 z-[1000] flex items-center justify-center bg-black bg-opacity-50"
              style="display: none;" x-transition x-cloak>
@@ -55,15 +68,15 @@
                     <button @click="closeCheckout()" class="text-gray-500 hover:text-gray-700">&times;</button>
                 </div>
 
-                <!-- Get total from the DOM element updated by HTMX -->
+                <!-- Total Display -->
                 <div class="mb-6 text-center">
                     <p class="text-gray-500 uppercase text-sm tracking-wide">Total a Pagar</p>
                     <p class="text-4xl font-extrabold text-blue-600">$<span x-text="currentTotal.toFixed(2)"></span></p>
                 </div>
 
-                <form hx-post="{% url 'pos_checkout' %}" hx-target="#checkout-result" 
-                      @submit="closeCheckout()">
-                    {% csrf_token %}
+                <form hx-post="api/checkout.php" hx-target="#cart-container" 
+                      @submit="closeCheckout()"> <!-- We close modal immediately on submit? Or wait for response? -->
+                      <!-- Better UX: close on submit. If error, toast appears. If success, toast appears. UI resets. -->
                     
                     <div class="mb-4">
                         <label class="block text-gray-700 font-bold mb-2">Método de Pago</label>
@@ -79,11 +92,9 @@
                                  <span class="font-semibold">Transferencia</span>
                             </label>
                         </div>
-                        <!-- Hidden field to store selected value -->
                         <input type="hidden" name="metodo_pago" x-model="paymentMethod">
                     </div>
 
-                    <!-- Always show fields to prevent modal resizing -->
                     <div class="mb-6">
                         <label class="block text-gray-700 font-bold mb-2">Monto Cliente</label>
                         <input type="number" step="0.01" x-model="cashGiven"
@@ -106,9 +117,6 @@
             </div>
         </div>
     </template>
-    
-    <!-- Success/Messages Container -->
-    <div id="checkout-result" class="fixed bottom-4 right-4 z-50"></div>
 
 </div>
 
@@ -117,18 +125,18 @@
         return {
             checkoutOpen: false,
             paymentMethod: 'Efectivo',
-            currentTotal: 0,
+            currentTotal: <?= $cartData['total'] ?>, // Init from server
             cashGiven: '',
             
             init() {
-                this.updateTotal();
+                // Ensure text is consistent with server state
             },
 
             openCheckout() {
-                this.updateTotal();
+                this.updateTotal(); // Refresh total before opening
                 if (this.currentTotal <= 0) return;
                 this.checkoutOpen = true;
-                this.setPaymentMode('Efectivo'); // Default to Efectivo on open
+                this.setPaymentMode('Efectivo');
             },
             
             closeCheckout() {
@@ -138,23 +146,23 @@
             setPaymentMode(mode) {
                 this.paymentMethod = mode;
                 if (mode === 'Transferencia') {
-                    // Auto-fill total for Transferencia
                     this.cashGiven = this.currentTotal.toFixed(2);
                 } else {
-                    // Clear for Efectivo to allow manual entry
                     this.cashGiven = '';
                 }
             },
             
             updateTotal() {
+                // Parse total from the rendered cart HTML specific element
+                // We rely on #cart-total-value existing in the re-rendered HTML
                 const el = document.getElementById('cart-total-value');
                 if (el) {
                     let val = el.innerText.trim();
-                    // Handle 1.200,50 (ES) or 1200.50 (EN)
-                    // If it has comma as last separator
-                    if (val.indexOf(',') > val.indexOf('.')) {
-                        val = val.replace(/\./g, '').replace(',', '.');
-                    }
+                    // Basic cleanup for currency format
+                    val = val.replace(/[^\d.,]/g, '');
+                    // Assuming EN format output from number_format usually (1,200.00)
+                    // If we used default english locale in PHP: comma is thousand sep, dot is decimal.
+                    val = val.replace(/,/g, ''); 
                     this.currentTotal = parseFloat(val) || 0;
                 } else {
                     this.currentTotal = 0;
@@ -169,12 +177,6 @@
             }
         }
     }
-    
-    // Auto focus
-    document.addEventListener('htmx:afterSwap', function(evt) {
-        if (evt.detail.target.id === 'cart-container') {
-             // Re-calculate total if modal is open (unlikely but safe)
-        }
-    });
 </script>
-{% endblock %}
+
+<?php include 'includes/footer.php'; ?>
