@@ -1,0 +1,14 @@
+<div id="new-toasts" hx-swap-oob="beforeend:#toast-container">
+    <div x-data="{ show: false }" 
+         x-init="setTimeout(() => show = true, 100); setTimeout(() => show = false, 3000); setTimeout(() => $el.remove(), 3300)"
+         x-show="show"
+         x-transition:enter="transform transition-all duration-300 ease-out"
+         x-transition:enter-start="translate-y-[-100%] opacity-0"
+         x-transition:enter-end="translate-y-0 opacity-100"
+         x-transition:leave="transform transition-all duration-300 ease-in"
+         x-transition:leave-start="translate-y-0 opacity-100"
+         x-transition:leave-end="translate-y-[-100%] opacity-0"
+         class="pointer-events-auto bg-white border-l-4 border-red-500 text-red-700 p-4 rounded shadow-xl flex items-center w-full shadow-lg">
+        <div class="flex-grow font-medium text-center">{{ error }}</div>
+    </div>
+</div>

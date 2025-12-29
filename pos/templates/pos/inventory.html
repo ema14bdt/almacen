@@ -1,0 +1,171 @@
+{% extends 'pos/base.html' %}
+
+{% block title %}Stock - Almacén EGP{% endblock %}
+
+{% block content %}
+<div x-data="inventoryApp()" @update-title.window="form.nombre = $event.detail.name">
+    <div class="space-y-6">
+        <div class="flex justify-between items-center">
+            <h1 class="text-3xl font-bold text-gray-800">Gestión de Stock</h1>
+            
+            <div class="flex items-center space-x-2">
+                <!-- Search Form -->
+                <form method="get" class="flex">
+                    <input type="text" name="q" value="{{ query|default:'' }}" 
+                           placeholder="Buscar producto..." 
+                           class="rounded-l-lg border-y border-l border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500">
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-r-lg hover:bg-blue-700">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </button>
+                </form>
+
+                <!-- Add Product Button -->
+                <button @click="newProduct()" 
+                        class="bg-green-600 text-white p-2 rounded-lg hover:bg-green-700 shadow flex items-center gap-2">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    <span class="hidden sm:inline font-bold">Nuevo Producto</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Products Table -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                            <th class="px-6 py-3 text-right"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 bg-white">
+                        {% for p in products %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ p.codigo_barra }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ p.nombre }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">${{ p.precio }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm {% if p.stock < 5 %}text-red-600 font-bold{% else %}text-green-600{% endif %}">
+                                {{ p.stock }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <button class="text-blue-600 hover:text-blue-900 font-bold"
+                                      @click="editProduct({
+                                          id: '{{ p.id }}',
+                                          codigo_barra: '{{ p.codigo_barra }}',
+                                          nombre: '{{ p.nombre|escapejs }}'
+                                      })">
+                                    Editar
+                                </button>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="px-6 py-10 text-center text-gray-500">
+                                No se encontraron productos.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            {% if products.has_other_pages %}
+            <div class="bg-gray-50 px-4 py-3 border-t border-gray-200 flex items-center justify-between sm:px-6">
+                <!-- Pagination Content (unchanged mostly) -->
+                 <div class="flex-1 flex justify-between sm:hidden">
+                    {% if products.has_previous %}
+                    <a href="?page={{ products.previous_page_number }}{% if query %}&q={{ query }}{% endif %}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Anterior</a>
+                    {% endif %}
+                    {% if products.has_next %}
+                    <a href="?page={{ products.next_page_number }}{% if query %}&q={{ query }}{% endif %}" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Siguiente</a>
+                    {% endif %}
+                </div>
+                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div>
+                         <p class="text-sm text-gray-700">
+                            Mostrando <span class="font-medium">{{ products.start_index }}</span> a <span class="font-medium">{{ products.end_index }}</span> de <span class="font-medium">{{ products.paginator.count }}</span> resultados
+                        </p>
+                    </div>
+                    <div>
+                        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                            {% if products.has_previous %}
+                            <a href="?page={{ products.previous_page_number }}{% if query %}&q={{ query }}{% endif %}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                <span class="sr-only">Anterior</span>
+                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                            </a>
+                            {% endif %}
+                            
+                            {% if products.has_next %}
+                            <a href="?page={{ products.next_page_number }}{% if query %}&q={{ query }}{% endif %}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                <span class="sr-only">Siguiente</span>
+                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>
+                            </a>
+                            {% endif %}
+                        </nav>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Modal Include -->
+    {% include 'pos/partials/inventory_modal.html' %}
+</div>
+
+<script>
+function inventoryApp() {
+    return {
+        open: false,
+        productId: null,
+        isEditMode: false,
+        form: {
+            codigo_barra: '',
+            nombre: ''
+        },
+        
+        newProduct() {
+            this.open = true;
+            this.isEditMode = false;
+            this.productId = null;
+            this.form.codigo_barra = '';
+            this.form.nombre = '';
+            
+            // Trigger Reset via HTMX to get empty form
+            this.$nextTick(() => {
+                 // Manually triggering request with empty val
+                 const el = this.$refs.barcodeInput;
+                 if(el) {
+                     // Ensure value is reset in DOM
+                     el.value = ''; 
+                     htmx.trigger(el, 'load-product');
+                 }
+            });
+        },
+        
+        editProduct(product) {
+            this.isEditMode = true;
+            this.productId = product.id;
+            this.form.codigo_barra = product.codigo_barra;
+            this.form.nombre = product.nombre;
+            this.open = true;
+            
+            this.$nextTick(() => {
+                const el = this.$refs.barcodeInput;
+                if(el) {
+                    // Force the value in case binding lags (though x-model handles it)
+                    el.value = product.codigo_barra; 
+                    htmx.trigger(el, 'load-product');
+                } else {
+                    console.error("Barcode input not found");
+                }
+            });
+        }
+    }
+}
+</script>
+{% endblock %}

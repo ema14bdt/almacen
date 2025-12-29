@@ -1,0 +1,16 @@
+<div id="new-toasts" hx-swap-oob="beforeend:#toast-container">
+    {% for message in messages %}
+        <div x-data="{ show: false }" 
+             x-init="setTimeout(() => show = true, 100); setTimeout(() => show = false, 3000); setTimeout(() => $el.remove(), 3300)"
+             x-show="show"
+             x-transition:enter="transform transition-all duration-300 ease-out"
+             x-transition:enter-start="translate-y-[-100%] opacity-0"
+             x-transition:enter-end="translate-y-0 opacity-100"
+             x-transition:leave="transform transition-all duration-300 ease-in"
+             x-transition:leave-start="translate-y-0 opacity-100"
+             x-transition:leave-end="translate-y-[-100%] opacity-0"
+             class="pointer-events-auto bg-white border-l-4 {% if message.tags == 'success' %}border-green-500 text-green-700{% elif message.tags == 'error' %}border-red-500 text-red-700{% else %}border-blue-500 text-blue-700{% endif %} p-4 rounded shadow-xl flex items-center w-full shadow-lg mb-2">
+            <div class="flex-grow font-medium text-center">{{ message }}</div>
+        </div>
+    {% endfor %}
+</div>
