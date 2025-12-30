@@ -37,8 +37,38 @@ def dashboard_view(request):
     # Calculate Total for Selected Day (if different from today, might be useful)
     selected_date_total = sales_history.aggregate(Sum('total'))['total__sum'] or 0
 
-    # Monthly History Chart (Simple)
-    history = Sale.objects.filter(fecha__year=today.year).values('fecha__month').annotate(total=Sum('total')).order_by('-fecha__month')
+    # Payment Method Breakdown for Selected Date
+    sales_cash = sales_history.filter(metodo_pago='Efectivo').aggregate(Sum('total'))['total__sum'] or 0
+    sales_transfer = sales_history.filter(metodo_pago='Transferencia').aggregate(Sum('total'))['total__sum'] or 0
+
+    # Monthly Payment Breakdown
+    sales_month_cash = Sale.objects.filter(fecha__month=today.month, fecha__year=today.year, metodo_pago='Efectivo').aggregate(Sum('total'))['total__sum'] or 0
+    sales_month_transfer = Sale.objects.filter(fecha__month=today.month, fecha__year=today.year, metodo_pago='Transferencia').aggregate(Sum('total'))['total__sum'] or 0
+
+    # Monthly History Chart (With Payment Breakdown)
+    from django.db.models import Q
+    
+    history_data = Sale.objects.filter(fecha__year=today.year).values('fecha__month').annotate(
+        monthly_total=Sum('total'),
+        total_cash=Sum('total', filter=Q(metodo_pago='Efectivo')),
+        total_transfer=Sum('total', filter=Q(metodo_pago='Transferencia'))
+    ).order_by('-fecha__month')
+    
+    # Map months to Spanish names
+    MONTH_NAMES = {
+        1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
+        5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
+        9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
+    }
+
+    history = []
+    for item in history_data:
+        history.append({
+            'month_name': MONTH_NAMES.get(item['fecha__month'], f"Mes {item['fecha__month']}"),
+            'total': item['monthly_total'],
+            'total_cash': item['total_cash'] or 0,
+            'total_transfer': item['total_transfer'] or 0
+        })
 
     context = {
         'sales_today': sales_today,
@@ -46,6 +76,10 @@ def dashboard_view(request):
         'selected_date': selected_date,
         'sales_history': sales_history,
         'selected_date_total': selected_date_total,
+        'sales_cash': sales_cash,
+        'sales_transfer': sales_transfer,
+        'sales_month_cash': sales_month_cash,
+        'sales_month_transfer': sales_month_transfer,
         'history': history,
     }
     return render(request, 'pos/dashboard.html', context)
@@ -101,8 +135,24 @@ def product_management_view(request):
         form = ProductForm()
 
     # Common GET logic for rendering the page
-    query = request.GET.get('q')
-    products_list = Product.objects.filter(activo=True).order_by('nombre')
+    query = request.GET.get('q', '')
+    sort_by = request.GET.get('sort', 'fecha_creacion')
+    direction = request.GET.get('direction', 'desc')
+    
+    # Valid sort fields to prevent SQL injection or errors
+    valid_sort_fields = ['codigo_barra', 'nombre', 'precio', 'stock', 'fecha_creacion']
+    if sort_by not in valid_sort_fields:
+        sort_by = 'fecha_creacion'
+    
+    # Apply direction
+    order_prefix = '-' if direction == 'desc' else ''
+    order_args = [f"{order_prefix}{sort_by}"]
+    
+    # Secondary sort for stability
+    if sort_by != 'nombre':
+        order_args.append('nombre')
+    
+    products_list = Product.objects.filter(activo=True).order_by(*order_args)
     
     if query:
         products_list = products_list.filter(Q(nombre__icontains=query) | Q(codigo_barra__icontains=query))
@@ -111,11 +161,22 @@ def product_management_view(request):
     page_number = request.GET.get('page')
     products = paginator.get_page(page_number)
     
+    # Calculate elided page range for better pagination
+    # We use a try-except block or check version if needed, but assuming modern Django
+    # as this is a new project.
+    if products.paginator.num_pages > 1:
+        page_range = products.paginator.get_elided_page_range(products.number, on_each_side=2, on_ends=1)
+    else:
+        page_range = []
+
     # Pass the form object to the context. 
     # If it was a failed POST, it's the invalid form. If GET, it's a new empty form.
     return render(request, 'pos/inventory.html', {
         'products': products, 
+        'page_range': page_range,
         'query': query,
+        'current_sort': sort_by,
+        'current_direction': direction,
         'form': form  # Pass the form to the template
     })
 

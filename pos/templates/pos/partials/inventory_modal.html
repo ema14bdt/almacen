@@ -34,7 +34,7 @@
                                hx-trigger="keyup changed delay:500ms, load-product from:body" 
                                hx-target="#inventory-modal-fields" 
                                hx-swap="outerHTML"
-                               @keydown.enter.prevent="$refs.form.submit()"
+                               @keydown.enter.prevent
                                {% if form.codigo_barra.value %}value="{{ form.codigo_barra.value }}"{% endif %}
                                {% if form.codigo_barra.field.disabled %}disabled{% endif %}
                                x-model="form.codigo_barra">

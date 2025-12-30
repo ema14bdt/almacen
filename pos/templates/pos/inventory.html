@@ -34,10 +34,38 @@
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition"
+                                data-href="?sort=codigo_barra&direction={% if current_sort == 'codigo_barra' and current_direction == 'asc' %}desc{% else %}asc{% endif %}{% if query %}&q={{ query|urlencode }}{% endif %}"
+                                onclick="window.location.href=this.dataset.href">
+                                Código
+                                {% if current_sort == 'codigo_barra' %}
+                                    <span class="ml-1 text-blue-600">{% if current_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+                                {% endif %}
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition"
+                                data-href="?sort=nombre&direction={% if current_sort == 'nombre' and current_direction == 'asc' %}desc{% else %}asc{% endif %}{% if query %}&q={{ query|urlencode }}{% endif %}"
+                                onclick="window.location.href=this.dataset.href">
+                                Nombre
+                                {% if current_sort == 'nombre' %}
+                                    <span class="ml-1 text-blue-600">{% if current_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+                                {% endif %}
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition"
+                                data-href="?sort=precio&direction={% if current_sort == 'precio' and current_direction == 'asc' %}desc{% else %}asc{% endif %}{% if query %}&q={{ query|urlencode }}{% endif %}"
+                                onclick="window.location.href=this.dataset.href">
+                                Precio
+                                {% if current_sort == 'precio' %}
+                                    <span class="ml-1 text-blue-600">{% if current_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+                                {% endif %}
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition"
+                                data-href="?sort=stock&direction={% if current_sort == 'stock' and current_direction == 'asc' %}desc{% else %}asc{% endif %}{% if query %}&q={{ query|urlencode }}{% endif %}"
+                                onclick="window.location.href=this.dataset.href">
+                                Stock
+                                {% if current_sort == 'stock' %}
+                                    <span class="ml-1 text-blue-600">{% if current_direction == 'asc' %}▲{% else %}▼{% endif %}</span>
+                                {% endif %}
+                            </th>
                             <th class="px-6 py-3 text-right"></th>
                         </tr>
                     </thead>
@@ -75,15 +103,17 @@
             <!-- Pagination -->
             {% if products.has_other_pages %}
             <div class="bg-gray-50 px-4 py-3 border-t border-gray-200 flex items-center justify-between sm:px-6">
-                <!-- Pagination Content (unchanged mostly) -->
-                 <div class="flex-1 flex justify-between sm:hidden">
+                <!-- Mobile Pagination -->
+                <div class="flex-1 flex justify-between sm:hidden">
                     {% if products.has_previous %}
-                    <a href="?page={{ products.previous_page_number }}{% if query %}&q={{ query }}{% endif %}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Anterior</a>
+                    <a href="?page={{ products.previous_page_number }}{% if query %}&q={{ query }}{% endif %}&sort={{ current_sort }}&direction={{ current_direction }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Anterior</a>
                     {% endif %}
                     {% if products.has_next %}
-                    <a href="?page={{ products.next_page_number }}{% if query %}&q={{ query }}{% endif %}" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Siguiente</a>
+                    <a href="?page={{ products.next_page_number }}{% if query %}&q={{ query }}{% endif %}&sort={{ current_sort }}&direction={{ current_direction }}" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Siguiente</a>
                     {% endif %}
                 </div>
+                
+                <!-- Desktop Pagination -->
                 <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                     <div>
                          <p class="text-sm text-gray-700">
@@ -92,18 +122,48 @@
                     </div>
                     <div>
                         <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                            <!-- Previous Button -->
                             {% if products.has_previous %}
-                            <a href="?page={{ products.previous_page_number }}{% if query %}&q={{ query }}{% endif %}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <a href="?page={{ products.previous_page_number }}{% if query %}&q={{ query }}{% endif %}&sort={{ current_sort }}&direction={{ current_direction }}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
                                 <span class="sr-only">Anterior</span>
                                 <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
                             </a>
+                            {% else %}
+                            <span class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-gray-100 text-sm font-medium text-gray-400 cursor-not-allowed">
+                                <span class="sr-only">Anterior</span>
+                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                            </span>
                             {% endif %}
                             
+                            <!-- Page Numbers -->
+                            {% for i in page_range %}
+                                {% if i == products.paginator.ELLIPSIS %}
+                                    <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">...</span>
+                                {% else %}
+                                    {% if products.number == i %}
+                                        <span class="relative inline-flex items-center px-4 py-2 border border-blue-500 bg-blue-50 text-sm font-bold text-blue-600 z-10">
+                                            {{ i }}
+                                        </span>
+                                    {% else %}
+                                        <a href="?page={{ i }}{% if query %}&q={{ query }}{% endif %}&sort={{ current_sort }}&direction={{ current_direction }}" 
+                                           class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                            {{ i }}
+                                        </a>
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
+                            
+                            <!-- Next Button -->
                             {% if products.has_next %}
-                            <a href="?page={{ products.next_page_number }}{% if query %}&q={{ query }}{% endif %}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <a href="?page={{ products.next_page_number }}{% if query %}&q={{ query }}{% endif %}&sort={{ current_sort }}&direction={{ current_direction }}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
                                 <span class="sr-only">Siguiente</span>
                                 <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>
                             </a>
+                            {% else %}
+                             <span class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-gray-100 text-sm font-medium text-gray-400 cursor-not-allowed">
+                                <span class="sr-only">Siguiente</span>
+                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>
+                            </span>
                             {% endif %}
                         </nav>
                     </div>
