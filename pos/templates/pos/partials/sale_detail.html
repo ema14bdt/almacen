@@ -1,3 +1,4 @@
+{% load custom_filters %}
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" 
      x-data="{ open: true }" x-show="open" @click.away="open = false; $el.remove()">
     <div class="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden transform transition-all">
@@ -29,7 +30,7 @@
                         <td class="px-3 py-2 text-sm text-gray-900">{{ detail.producto.codigo_barra }}</td>
                         <td class="px-3 py-2 text-sm text-gray-900">{{ detail.producto.nombre }}</td>
                         <td class="px-3 py-2 text-sm text-center text-gray-700">{{ detail.cantidad }}</td>
-                        <td class="px-3 py-2 text-sm text-right font-bold">${{ detail.subtotal|floatformat:2 }}</td>
+                        <td class="px-3 py-2 text-sm text-right font-bold">{{ detail.subtotal|currency_fmt }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -38,7 +39,7 @@
 
         <!-- Footer -->
         <div class="bg-gray-50 px-4 py-3 border-t text-right">
-            <span class="text-lg font-bold text-gray-900">Total: ${{ sale.total|floatformat:2 }}</span>
+            <span class="text-lg font-bold text-gray-900">Total: {{ sale.total|currency_fmt }}</span>
         </div>
     </div>
 </div>

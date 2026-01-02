@@ -1,4 +1,5 @@
 {% extends 'pos/base.html' %}
+{% load custom_filters %}
 
 {% block title %}Stock - Almacén EGP{% endblock %}
 
@@ -74,7 +75,7 @@
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ p.codigo_barra }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ p.nombre }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">${{ p.precio }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">{{ p.precio|currency_fmt }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm {% if p.stock < 5 %}text-red-600 font-bold{% else %}text-green-600{% endif %}">
                                 {{ p.stock }}
                             </td>

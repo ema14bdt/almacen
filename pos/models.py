@@ -46,3 +46,18 @@ class SaleDetail(models.Model):
 
     def __str__(self):
         return f"{self.cantidad}x {self.producto.nombre} en Venta #{self.venta.id}"
+
+class CashRegisterSession(models.Model):
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
+    fecha_apertura = models.DateTimeField(default=timezone.now)
+    fecha_cierre = models.DateTimeField(null=True, blank=True)
+    monto_apertura = models.DecimalField(max_digits=12, decimal_places=2)
+    monto_cierre = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+
+    @property
+    def activa(self):
+        return self.fecha_cierre is None
+
+    def __str__(self):
+        status = "Abierta" if self.activa else "Cerrada"
+        return f"Caja {status} - {self.usuario.username} - {self.fecha_apertura.strftime('%Y-%m-%d %H:%M')}"

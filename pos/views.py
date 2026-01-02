@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.cache import never_cache
 from django.contrib.auth.decorators import login_required
-from .models import Product, Sale, SaleDetail
+from .models import Product, Sale, SaleDetail, CashRegisterSession
 from .forms import ProductForm
 import datetime
 import json
@@ -24,6 +24,17 @@ def dashboard_view(request):
             selected_date = timezone.now().date()
     else:
         selected_date = timezone.now().date()
+    # Cash Register Status
+    active_session = CashRegisterSession.objects.filter(usuario=request.user, fecha_cierre__isnull=True).first()
+    active_session_total = 0
+    if active_session:
+        # Sum cash sales since the session opened
+        session_sales = Sale.objects.filter(
+            usuario=request.user, 
+            fecha__gte=active_session.fecha_apertura, 
+            metodo_pago='Efectivo'
+        ).aggregate(Sum('total'))['total__sum'] or 0
+        active_session_total = active_session.monto_apertura + session_sales
 
     # Stats (General)
     today = timezone.now().date()
@@ -31,15 +42,33 @@ def dashboard_view(request):
     sales_month = Sale.objects.filter(fecha__month=today.month, fecha__year=today.year).aggregate(Sum('total'))['total__sum'] or 0
 
     # Sales Table for Selected Date
-    # Order by newest first
-    sales_history = Sale.objects.filter(fecha__date=selected_date).order_by('-fecha')
+    from django.core.paginator import Paginator
+    
+    # Sorting
+    sort_by = request.GET.get('sort', '-fecha')
+    if sort_by not in ['fecha', '-fecha', 'total', '-total', 'metodo_pago', '-metodo_pago']:
+        sort_by = '-fecha'
+        
+    sales_history_list = Sale.objects.filter(fecha__date=selected_date).order_by(sort_by)
+    
+    # Pagination
+    paginator = Paginator(sales_history_list, 20) # 10 items per page
+    page_number = request.GET.get('page')
+    sales_history = paginator.get_page(page_number)
+    
+    # Calculations based on full list, not paginated one
+    full_day_sales = Sale.objects.filter(fecha__date=selected_date)
+    selected_date_total = full_day_sales.aggregate(Sum('total'))['total__sum'] or 0
+    sales_cash = full_day_sales.filter(metodo_pago='Efectivo').aggregate(Sum('total'))['total__sum'] or 0
+    sales_transfer = full_day_sales.filter(metodo_pago='Transferencia').aggregate(Sum('total'))['total__sum'] or 0
+    
     
     # Calculate Total for Selected Day (if different from today, might be useful)
-    selected_date_total = sales_history.aggregate(Sum('total'))['total__sum'] or 0
+    # selected_date_total = sales_history.aggregate(Sum('total'))['total__sum'] or 0
 
     # Payment Method Breakdown for Selected Date
-    sales_cash = sales_history.filter(metodo_pago='Efectivo').aggregate(Sum('total'))['total__sum'] or 0
-    sales_transfer = sales_history.filter(metodo_pago='Transferencia').aggregate(Sum('total'))['total__sum'] or 0
+    # sales_cash = sales_history.filter(metodo_pago='Efectivo').aggregate(Sum('total'))['total__sum'] or 0
+    # sales_transfer = sales_history.filter(metodo_pago='Transferencia').aggregate(Sum('total'))['total__sum'] or 0
 
     # Monthly Payment Breakdown
     sales_month_cash = Sale.objects.filter(fecha__month=today.month, fecha__year=today.year, metodo_pago='Efectivo').aggregate(Sum('total'))['total__sum'] or 0
@@ -48,11 +77,14 @@ def dashboard_view(request):
     # Monthly History Chart (With Payment Breakdown)
     from django.db.models import Q
     
-    history_data = Sale.objects.filter(fecha__year=today.year).values('fecha__month').annotate(
+    # Calculate date 12 months ago
+    one_year_ago = today - datetime.timedelta(days=365)
+
+    history_data = Sale.objects.filter(fecha__date__gte=one_year_ago).values('fecha__year', 'fecha__month').annotate(
         monthly_total=Sum('total'),
         total_cash=Sum('total', filter=Q(metodo_pago='Efectivo')),
         total_transfer=Sum('total', filter=Q(metodo_pago='Transferencia'))
-    ).order_by('-fecha__month')
+    ).order_by('-fecha__year', '-fecha__month')[:12]
     
     # Map months to Spanish names
     MONTH_NAMES = {
@@ -65,6 +97,8 @@ def dashboard_view(request):
     for item in history_data:
         history.append({
             'month_name': MONTH_NAMES.get(item['fecha__month'], f"Mes {item['fecha__month']}"),
+            'year': item['fecha__year'],
+            'month_number': item['fecha__month'],
             'total': item['monthly_total'],
             'total_cash': item['total_cash'] or 0,
             'total_transfer': item['total_transfer'] or 0
@@ -81,6 +115,9 @@ def dashboard_view(request):
         'sales_month_cash': sales_month_cash,
         'sales_month_transfer': sales_month_transfer,
         'history': history,
+        'active_session': active_session,
+        'active_session_total': active_session_total,
+        'current_sort': sort_by,
     }
     return render(request, 'pos/dashboard.html', context)
 
@@ -357,6 +394,17 @@ def checkout_view(request):
                 'error': f'Stock insuficiente para {product.nombre} (Disponibles: {product.stock})'
             })
             response['HX-Reswap'] = 'none'
+            response['HX-Reswap'] = 'none'
+            return response
+
+    # 1.5. Validate Cash Register Session (New Check)
+    if metodo_pago == 'Efectivo':
+        active_session = CashRegisterSession.objects.filter(usuario=request.user, fecha_cierre__isnull=True).exists()
+        if not active_session:
+            response = render(request, 'pos/partials/scan_feedback.html', {
+                'error': 'No se pueden realizar ventas en efectivo sin Abrir Caja.'
+            })
+            response['HX-Reswap'] = 'none'
             return response
 
     # 2. Create Sale and Prepare Bulk Operations
@@ -416,3 +464,54 @@ def checkout_view(request):
     response.content += oob_cart.encode('utf-8')
     
     return response
+
+@login_required
+@require_http_methods(["POST"])
+def open_register_view(request):
+    amount = request.POST.get('amount')
+    try:
+        amount = float(amount)
+    except (ValueError, TypeError):
+        messages.error(request, "Monto inválido.")
+        return redirect('dashboard')
+
+    if CashRegisterSession.objects.filter(usuario=request.user, fecha_cierre__isnull=True).exists():
+        messages.warning(request, "Ya tienes una caja abierta.")
+    else:
+        CashRegisterSession.objects.create(
+            usuario=request.user,
+            monto_apertura=amount
+        )
+        messages.success(request, f"Caja abierta con ${amount}")
+    
+    return redirect('dashboard')
+
+@login_required
+@require_http_methods(["POST"])
+def close_register_view(request):
+    amount = request.POST.get('amount')
+    try:
+        amount = float(amount)
+    except (ValueError, TypeError):
+        messages.error(request, "Monto inválido.")
+        return redirect('dashboard')
+
+    session = CashRegisterSession.objects.filter(usuario=request.user, fecha_cierre__isnull=True).first()
+    if session:
+        session.monto_cierre = amount
+        session.fecha_cierre = timezone.now()
+        session.save()
+        messages.success(request, f"Caja cerrada con ${amount}")
+    else:
+        messages.error(request, "No hay una caja abierta para cerrar.")
+    
+    return redirect('dashboard')
+
+@login_required
+def session_history_detail_view(request, year, month):
+    sessions = CashRegisterSession.objects.filter(
+        fecha_apertura__year=year,
+        fecha_apertura__month=month
+    ).order_by('-fecha_apertura')
+    
+    return render(request, 'pos/partials/session_history_detail.html', {'sessions': sessions})

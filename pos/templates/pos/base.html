@@ -16,6 +16,17 @@
 
     <style>
         [x-cloak] { display: none !important; }
+        
+        /* Hide number input spinners */
+        .no-spinner::-webkit-inner-spin-button, 
+        .no-spinner::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        .no-spinner {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
     </style>
     {% block extra_head %}{% endblock %}
 </head>
@@ -25,9 +36,9 @@
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
             <a href="{% url 'dashboard' %}" class="text-xl font-bold hover:text-blue-100">Almacén EGP</a>
             <div class="space-x-4">
-                <a href="{% url 'dashboard' %}" class="hover:underline">Panel de Ventas</a>
-                <a href="{% url 'product_management' %}" class="hover:underline">Stock</a>
-                <a href="{% url 'pos' %}" class="hover:underline font-bold bg-white text-black px-3 py-1 rounded">POS</a>
+                <a href="{% url 'dashboard' %}" class="hover:underline {% if request.resolver_match.url_name == 'dashboard' %}underline font-bold text-blue-200{% endif %}">Panel de Ventas</a>
+                <a href="{% url 'product_management' %}" class="hover:underline {% if request.resolver_match.url_name == 'product_management' %}underline font-bold text-blue-200{% endif %}">Stock</a>
+                <a href="{% url 'pos' %}" class="hover:underline font-bold bg-white text-black px-3 py-1 rounded {% if request.resolver_match.url_name == 'pos' %}ring-2 ring-blue-500{% endif %}">POS</a>
             </div>
         </div>
     </nav>

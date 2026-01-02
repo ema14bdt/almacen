@@ -35,6 +35,9 @@ class ProductForm(forms.ModelForm):
             'nombre': forms.TextInput(attrs={'class': 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border'}),
             'precio': forms.NumberInput(attrs={'class': 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border', 'step': '0.01'}),
         }
+        labels = {
+            'codigo_barra': 'Código de barra',
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

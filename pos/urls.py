@@ -18,4 +18,9 @@ urlpatterns = [
     path('pos/remove/<str:barcode>/', views.remove_cart_item_view, name='pos_remove_item'),
     path('pos/clear/', views.clear_cart_view, name='pos_clear_cart'),
     path('pos/checkout/', views.checkout_view, name='pos_checkout'),
+
+    # Cash Register
+    path('register/open/', views.open_register_view, name='open_register'),
+    path('register/close/', views.close_register_view, name='close_register'),
+    path('register/history/<int:year>/<int:month>/', views.session_history_detail_view, name='session_history_detail'),
 ]

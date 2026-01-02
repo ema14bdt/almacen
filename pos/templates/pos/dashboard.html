@@ -1,10 +1,29 @@
 {% extends 'pos/base.html' %}
+{% load custom_filters %}
 
 {% block title %}Dashboard - Almacén EGP{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-    <h1 class="text-3xl font-bold text-gray-800">Panel de Ventas</h1>
+<div class="space-y-6" x-data="{ openModal: false, closeModal: false }">
+    <div class="flex justify-between items-center">
+        <h1 class="text-3xl font-bold text-gray-800">Panel de Ventas</h1>
+        <div>
+            {% if active_session %}
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-600 font-medium">
+                        Caja Abierta: {{ active_session_total|currency_fmt }}
+                    </span>
+                    <button @click="closeModal = true" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 font-bold shadow transition">
+                        Cerrar Caja
+                    </button>
+                </div>
+            {% else %}
+                <button @click="openModal = true" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-bold shadow">
+                    Abrir Caja
+                </button>
+            {% endif %}
+        </div>
+    </div>
     
     <!-- Date Filter & Sales Table -->
     <div class="bg-white rounded-lg shadow-md overflow-hidden">
@@ -22,9 +41,21 @@
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hora</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pago</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                            <a href="?date={{ selected_date|date:'Y-m-d' }}&sort={% if current_sort == 'fecha' %}-fecha{% else %}fecha{% endif %}">
+                                Hora {% if current_sort == 'fecha' %}↑{% elif current_sort == '-fecha' %}↓{% endif %}
+                            </a>
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                             <a href="?date={{ selected_date|date:'Y-m-d' }}&sort={% if current_sort == 'metodo_pago' %}-metodo_pago{% else %}metodo_pago{% endif %}">
+                                Pago {% if current_sort == 'metodo_pago' %}↑{% elif current_sort == '-metodo_pago' %}↓{% endif %}
+                            </a>
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">
+                             <a href="?date={{ selected_date|date:'Y-m-d' }}&sort={% if current_sort == 'total' %}-total{% else %}total{% endif %}">
+                                Total {% if current_sort == 'total' %}↑{% elif current_sort == '-total' %}↓{% endif %}
+                            </a>
+                        </th>
                         <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase"></th>
                     </tr>
                 </thead>
@@ -40,7 +71,7 @@
                             </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                            ${{ sale.total|floatformat:2 }}
+                            {{ sale.total|currency_fmt }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <button hx-get="{% url 'sale_detail' sale.id %}" 
@@ -60,12 +91,73 @@
                 {% if sales_history %}
                 <tfoot class="bg-gray-50">
                     <tr>
-                        <td colspan="2" class="px-6 py-3 text-right text-sm font-bold text-gray-900">Total del Día:</td>
-                        <td class="px-6 py-3 text-left text-sm font-bold text-gray-900">${{ selected_date_total|floatformat:2 }}</td>
+                        <td colspan="2" class="px-6 py-3 text-right text-sm font-bold text-gray-900">Total:</td>
+                        <td class="px-6 py-3 text-left text-sm font-bold text-gray-900">{{ selected_date_total|currency_fmt }}</td>
                         <td></td>
                     </tr>
                 </tfoot>
                 {% endif %}
+                {% if sales_history.has_other_pages %}
+                <tfoot class="bg-white border-t border-gray-200">
+                    <tr>
+                        <td colspan="4" class="px-6 py-3">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1 flex justify-between sm:hidden">
+                                    {% if sales_history.has_previous %}
+                                        <a href="?date={{ selected_date|date:'Y-m-d' }}&sort={{ current_sort }}&page={{ sales_history.previous_page_number }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Anterior</a>
+                                    {% endif %}
+                                    {% if sales_history.has_next %}
+                                        <a href="?date={{ selected_date|date:'Y-m-d' }}&sort={{ current_sort }}&page={{ sales_history.next_page_number }}" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Siguiente</a>
+                                    {% endif %}
+                                </div>
+                                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                                    <div>
+                                        <p class="text-sm text-gray-700">
+                                            Mostrando <span class="font-medium">{{ sales_history.start_index }}</span> a <span class="font-medium">{{ sales_history.end_index }}</span> de <span class="font-medium">{{ sales_history.paginator.count }}</span> resultados
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                                            {% if sales_history.has_previous %}
+                                                <a href="?date={{ selected_date|date:'Y-m-d' }}&sort={{ current_sort }}&page={{ sales_history.previous_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                                    <span class="sr-only">Anterior</span>
+                                                    <!-- Chevron Left -->
+                                                    <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                        <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                                    </svg>
+                                                </a>
+                                            {% endif %}
+                                            
+                                            {% for i in sales_history.paginator.page_range %}
+                                                {% if sales_history.number == i %}
+                                                    <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-blue-50 text-sm font-medium text-blue-600">
+                                                        {{ i }}
+                                                    </span>
+                                                {% else %}
+                                                    <a href="?date={{ selected_date|date:'Y-m-d' }}&sort={{ current_sort }}&page={{ i }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                                        {{ i }}
+                                                    </a>
+                                                {% endif %}
+                                            {% endfor %}
+
+                                            {% if sales_history.has_next %}
+                                                <a href="?date={{ selected_date|date:'Y-m-d' }}&sort={{ current_sort }}&page={{ sales_history.next_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                                    <span class="sr-only">Siguiente</span>
+                                                    <!-- Chevron Right -->
+                                                    <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                                                    </svg>
+                                                </a>
+                                            {% endif %}
+                                        </nav>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+
             </table>
         </div>
     </div>
@@ -77,29 +169,29 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500">
             <h2 class="text-lg font-semibold text-gray-500">Ventas {{ selected_date|date:"d/m/Y" }}</h2>
-            <p class="text-4xl font-bold text-gray-800">${{ selected_date_total|floatformat:2 }}</p>
+            <p class="text-4xl font-bold text-gray-800">{{ selected_date_total|currency_fmt }}</p>
             <div class="mt-4 pt-4 border-t border-gray-100 flex justify-between text-sm">
                 <div>
                     <span class="block text-gray-400 text-xs">Efectivo</span>
-                    <span class="font-bold text-gray-700">${{ sales_cash|floatformat:2 }}</span>
+                    <span class="font-bold text-gray-700">{{ sales_cash|currency_fmt }}</span>
                 </div>
                 <div class="text-right">
                     <span class="block text-gray-400 text-xs">Transferencia</span>
-                    <span class="font-bold text-gray-700">${{ sales_transfer|floatformat:2 }}</span>
+                    <span class="font-bold text-gray-700">{{ sales_transfer|currency_fmt }}</span>
                 </div>
             </div>
         </div>
         <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-green-500">
-            <h2 class="text-lg font-semibold text-gray-500">Ventas de este Mes</h2>
-            <p class="text-4xl font-bold text-gray-800">${{ sales_month|floatformat:2 }}</p>
+            <h2 class="text-lg font-semibold text-gray-500">Ventas del Mes</h2>
+            <p class="text-4xl font-bold text-gray-800">{{ sales_month|currency_fmt }}</p>
             <div class="mt-4 pt-4 border-t border-gray-100 flex justify-between text-sm">
                 <div>
                     <span class="block text-gray-400 text-xs">Efectivo</span>
-                    <span class="font-bold text-gray-700">${{ sales_month_cash|floatformat:2 }}</span>
+                    <span class="font-bold text-gray-700">{{ sales_month_cash|currency_fmt }}</span>
                 </div>
                 <div class="text-right">
                     <span class="block text-gray-400 text-xs">Transferencia</span>
-                    <span class="font-bold text-gray-700">${{ sales_month_transfer|floatformat:2 }}</span>
+                    <span class="font-bold text-gray-700">{{ sales_month_transfer|currency_fmt }}</span>
                 </div>
             </div>
         </div>
@@ -110,40 +202,103 @@
         <div class="p-6 border-b border-gray-200 bg-gray-50">
             <h2 class="text-xl font-semibold text-gray-800">Historial Mensual (Últimos 12 Meses)</h2>
         </div>
-        {% if history %}
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mes/Año (Índice)</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Ventas</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Efectivo</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transferencia</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        {% for item in history %}
-                        <tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {{ item.month_name }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                                ${{ item.total|floatformat:2 }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                ${{ item.total_cash|floatformat:2 }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                ${{ item.total_transfer|floatformat:2 }}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mes/Año (Índice)</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Ventas</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Efectivo</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transferencia</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Caja</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for item in history %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ item.month_name }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                            {{ item.total|currency_fmt }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ item.total_cash|currency_fmt }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ item.total_transfer|currency_fmt }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <button hx-get="{% url 'session_history_detail' item.year item.month_number %}" 
+                                    hx-target="#modal-container" 
+                                    hx-swap="innerHTML"
+                                    class="text-indigo-600 hover:text-indigo-900 font-bold hover:underline">
+                                Ver Detalle
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="px-6 py-10 text-center text-gray-500">
+                            No hay historial de ventas.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <!-- Open Register Modal -->
+    <div x-show="openModal" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;" x-cloak>
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="openModal = false">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
             </div>
-        {% else %}
-            <p class="text-gray-500">No hay historial de ventas suficiente.</p>
-        {% endif %}
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <form action="{% url 'open_register' %}" method="POST" class="p-6">
+                    {% csrf_token %}
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Apertura de Caja</h3>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Monto de Apertura (Efectivo)</label>
+                        <input type="number" step="0.01" name="amount" required 
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border" 
+                               placeholder="0.00">
+                    </div>
+                    <div class="flex justify-end gap-3 mt-6">
+                        <button type="button" @click="openModal = false" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">Cancelar</button>
+                        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 font-bold">Abrir Caja</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Close Register Modal -->
+    <div x-show="closeModal" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;" x-cloak>
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="closeModal = false">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <form action="{% url 'close_register' %}" method="POST" class="p-6">
+                    {% csrf_token %}
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Cierre de Caja</h3>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Monto de Cierre (Efectivo Actual)</label>
+                        <input type="number" step="0.01" name="amount" required 
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border" 
+                               placeholder="0.00">
+                        <p class="text-xs text-gray-500 mt-1">Ingresa el total de efectivo contado en caja.</p>
+                    </div>
+                    <div class="flex justify-end gap-3 mt-6">
+                        <button type="button" @click="closeModal = false" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">Cancelar</button>
+                        <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 font-bold">Cerrar Caja</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

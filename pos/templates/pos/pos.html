@@ -1,4 +1,5 @@
 {% extends 'pos/base.html' %}
+{% load custom_filters %}
 
 {% block title %}Punto de Venta - Almacén EGP{% endblock %}
 
@@ -23,7 +24,7 @@
             </form>
         </div>
         
-        <div class="flex space-x-2">
+        <div class="flex space-x-2 relative z-10">
             <button hx-post="{% url 'pos_clear_cart' %}" hx-target="#cart-container"
                     :disabled="currentTotal <= 0"
                     :class="{'opacity-50 cursor-not-allowed': currentTotal <= 0, 'hover:bg-red-600': currentTotal > 0}"
@@ -58,7 +59,7 @@
                 <!-- Get total from the DOM element updated by HTMX -->
                 <div class="mb-6 text-center">
                     <p class="text-gray-500 uppercase text-sm tracking-wide">Total a Pagar</p>
-                    <p class="text-4xl font-extrabold text-blue-600">$<span x-text="currentTotal.toFixed(2)"></span></p>
+                    <p class="text-4xl font-extrabold text-blue-600"><span x-html="formatMoney(currentTotal)"></span></p>
                 </div>
 
                 <form hx-post="{% url 'pos_checkout' %}" hx-target="#checkout-result" 
@@ -95,7 +96,7 @@
                              :class="{'opacity-50': paymentMethod === 'Transferencia'}">
                             <span class="font-bold text-gray-600">Vuelto:</span>
                             <span class="font-bold text-green-600 text-xl" 
-                                  x-text="calculateChange()">0.00</span>
+                                  x-html="formatMoney(calculateChange())">0.00</span>
                         </div>
                     </div>
 
@@ -150,6 +151,9 @@
                 const el = document.getElementById('cart-total-value');
                 if (el) {
                     let val = el.innerText.trim();
+                    // Remove currency symbol and whitespace
+                    val = val.replace(/[^\d.,-]/g, '');
+                    
                     // Handle 1.200,50 (ES) or 1200.50 (EN)
                     // If it has comma as last separator
                     if (val.indexOf(',') > val.indexOf('.')) {
@@ -166,6 +170,63 @@
                 const total = this.currentTotal;
                 if (given < total) return '0.00';
                 return (given - total).toFixed(2);
+            },
+            
+            formatMoney(amount) {
+                // Ensure float
+                amount = parseFloat(amount) || 0;
+                // Format: 1.234,56
+                const formatted = new Intl.NumberFormat('es-AR', {
+                    minimumFractionDigits: 2, 
+                    maximumFractionDigits: 2
+                }).format(amount);
+                
+                // Split parts (assuming es-AR uses comma for decimals)
+                // If the browser locale es-AR uses comma, it will be "1.234,56"
+                // Let's rely on the split by comma or dot logic for robustness, 
+                // but es-AR standard is thousands=., decimal=,
+                
+                // Manual fallback if Intl not consistent (unlikely but safe)
+                // Actually easier to just replace last separator
+                
+                let parts = formatted.split(',');
+                if (parts.length === 1) {
+                     // Maybe it used dot?
+                     parts = formatted.split('.');
+                }
+                
+                // If still 1 part (no decimals), add 00
+                if (parts.length === 1) {
+                    return `$${parts[0]},<span class="text-gray-400">00</span>`;
+                }
+                
+                // Reconstruct
+                // The last part is decimals.
+                // Previous parts join with dot (thousands)
+                // But wait, split removes the separator.
+                
+                // Let's use string manipulation on the formatted string
+                // 1.234,56
+                const lastComma = formatted.lastIndexOf(',');
+                if (lastComma !== -1) {
+                    const integer = formatted.substring(0, lastComma);
+                    const decimal = formatted.substring(lastComma + 1);
+                     return `$${integer},<span class="text-gray-400">${decimal}</span>`;
+                }
+                
+                // Fallback (e.g. if locale uses dot for decimal)
+                const lastDot = formatted.lastIndexOf('.');
+                 if (lastDot !== -1) {
+                    const integer = formatted.substring(0, lastDot); // 1,234
+                    // Swap comma/dot for visual consistency with site if formatted is 1,234.56
+                    // But we want 1.234,56
+                    // If Intl gives 1,234.56 (US style), we swap chars
+                    const decimal = formatted.substring(lastDot + 1);
+                    const swappedInt = integer.replace(/,/g, '.');
+                    return `$${swappedInt},<span class="text-gray-400">${decimal}</span>`;
+                }
+                
+                return `$${formatted},<span class="text-gray-400">00</span>`;
             }
         }
     }
